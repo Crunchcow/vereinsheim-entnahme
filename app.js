@@ -1,49 +1,30 @@
-// ---- Konfiguration (später anpassen) ----
+// ---- Konfiguration ----
 const CONFIG = {
-  // Lookup-Flow (GET) – komplette URL inkl. Secret am Ende:
-  lookupEndpoint: "https://defaulteee05d909b754472b1cd58561389d4.d0.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/f783fa9e5318425c99947d805c4cd10f/triggers/manual/paths/invoke/?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=I5HNEZ3GG1im8YwjO6FP61EkuyekTrJ0_U-XYv3Cg7Q&key=vwX7-84jhs",
-  
-  // Submit-Flow (POST) – kommt später
-  endpoint: "",
+  lookupEndpoint: "DEINE_LOOKUP_FLOW_URL?key=DEIN_LOOKUP_SECRET", // <- morgen einsetzen
+  endpoint: "", // POST-Flow-URL (kommt später in Schritt 2)
   secretHeaderName: "x-pp-secret",
   secretHeaderValue: "",
-  
   allowedUnits: ["Flasche", "Kiste"]
 };
 
-// ---- Globale Variablen ----
-let articles = []; // Wird dynamisch aus Lookup-Flow befüllt
+// ---- Fallback-Daten (für Testbetrieb ohne Flow) ----
+const FALLBACK = {
+  teams: ["1. Herren", "2. Herren"],
+  articles: [
+    "Bier", "Cola", "Wasser", "Fanta", "Spezi", "Radler",
+    "Apfelschorle", "Energy", "Iso-Getränk", "Traubensaft", "Kirschsaft",
+    "Orangensaft", "Wasser still", "Wasser medium", "Kaffee", "Tee"
+  ]
+};
+
+// ---- UI-Elemente ----
 const grid = document.getElementById("itemsGrid");
 const teamSel = document.getElementById("team");
 const msg = document.getElementById("msg");
+let articles = [];
 const state = {}; // z.B. {"Bier": {Flasche:0, Kiste:0}, ...}
 
-// ---- Lookup-Flow abrufen ----
-async function fetchLookups() {
-  try {
-    setMsg("Lade Daten…");
-    const res = await fetch(CONFIG.lookupEndpoint, { method: "GET" });
-    const data = await res.json();
-    if (!res.ok || data.ok === false) throw new Error(data.message || "Lookup fehlgeschlagen");
-
-    // Teams ins Dropdown
-    const teamOptions = (data.teams || []).map(t => t.Teamname).filter(Boolean);
-    teamSel.innerHTML = `<option value="">– bitte Team wählen –</option>` +
-      teamOptions.map(t => `<option>${t}</option>`).join("");
-
-    // Artikel in Liste
-    articles = (data.articles || []).map(a => a.Artikel).filter(Boolean);
-
-    // Kacheln aufbauen
-    buildTiles();
-    setMsg("");
-  } catch (err) {
-    console.error(err);
-    setMsg("Konnte Teams/Artikel nicht laden. Bitte später erneut versuchen.", "err");
-  }
-}
-
-// ---- UI aufbauen ----
+// ---- Tiles aufbauen ----
 function buildTiles() {
   grid.innerHTML = "";
   articles.forEach(a => {
@@ -78,6 +59,7 @@ function buildTiles() {
   }, { passive: true });
 }
 
+// ---- Formular zurücksetzen ----
 function resetForm() {
   Object.keys(state).forEach(a => CONFIG.allowedUnits.forEach(u => {
     state[a][u] = 0;
@@ -88,11 +70,13 @@ function resetForm() {
   setMsg("");
 }
 
+// ---- Nachricht setzen ----
 function setMsg(text, type) {
   msg.className = "msg" + (type ? " " + type : "");
   msg.textContent = text || "";
 }
 
+// ---- Payload sammeln ----
 function collectPayload() {
   const team = teamSel.value.trim();
   const positions = [];
@@ -105,14 +89,13 @@ function collectPayload() {
   return { team, positions, quelle: "MiniWebApp", clientTime: new Date().toISOString() };
 }
 
-// ---- Senden an Flow (kommt in Schritt 2) ----
+// ---- Daten an Flow senden ----
 async function submitData() {
   const payload = collectPayload();
   if (!payload.team) return setMsg("Bitte ein Team wählen.", "err");
   if (payload.positions.length === 0) return setMsg("Bitte mindestens eine Menge über die ±-Buttons setzen.", "err");
 
   if (!CONFIG.endpoint) {
-    // Bis der Flow steht, zeigen wir nur eine Vorschau in der Konsole.
     console.log("DEMO: Würde senden:", payload);
     setMsg(`Demo: Erfasst ${payload.positions.length} Position(en). (Flow-Endpunkt noch nicht konfiguriert)`, "ok");
     return;
@@ -135,6 +118,30 @@ async function submitData() {
   } catch (err) {
     console.error(err);
     setMsg("Fehler bei der Übermittlung. Bitte später erneut versuchen.", "err");
+  }
+}
+
+// ---- Lookup-Daten laden ----
+async function fetchLookups() {
+  try {
+    if (!CONFIG.lookupEndpoint) throw new Error("Lookup-URL nicht konfiguriert");
+    const res = await fetch(CONFIG.lookupEndpoint);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (!data.teams || !data.articles) throw new Error("Ungültiges Lookup-Format");
+
+    teamSel.innerHTML = `<option value="">– bitte Team wählen –</option>` +
+      data.teams.map(t => `<option>${t}</option>`).join("");
+    articles = data.articles.slice();
+    buildTiles();
+  } catch (err) {
+    console.error("Lookup-Fehler:", err);
+    // Fallback nutzen, damit die Seite testbar bleibt
+    teamSel.innerHTML = `<option value="">– bitte Team wählen –</option>` +
+      FALLBACK.teams.map(t => `<option>${t}</option>`).join("");
+    articles = FALLBACK.articles.slice();
+    buildTiles();
+    setMsg("Hinweis: Live-Daten nicht erreichbar, Fallback aktiv.", "err");
   }
 }
 
