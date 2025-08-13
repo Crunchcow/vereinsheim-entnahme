@@ -1,16 +1,10 @@
 // ---- Konfiguration (später anpassen) ----
 const CONFIG = {
-  // Power Automate HTTP-Endpoint – tragen wir ein, sobald der Flow steht:
-  endpoint: "", // <-- TODO
+  lookupEndpoint: "https://defaulteee05d909b754472b1cd58561389d4.d0.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/f783fa9e5318425c99947d805c4cd10f/triggers/manual/paths/invoke/?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=I5HNEZ3GG1im8YwjO6FP61EkuyekTrJ0_U-XYv3Cg7Q&key=vwX7-84jhs",
+  endpoint: "",
   secretHeaderName: "x-pp-secret",
-  secretHeaderValue: "", // <-- TODO
-  allowedUnits: ["Flasche", "Kiste"],
-  // Platzhalter-Artikel (16 Stück). Später optional dynamisch aus Excel/Flow laden.
-  articles: [
-    "Bier","Cola","Wasser","Fanta","Spezi","Radler","Apfelschorle",
-    "Energy","Iso-Getränk","Traubensaft","Kirschsaft","Orangensaft",
-    "Wasser still","Wasser medium","Kaffee","Tee"
-  ]
+  secretHeaderValue: "",
+  allowedUnits: ["Flasche", "Kiste"]
 };
 
 // ---- UI aufbauen ----
