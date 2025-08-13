@@ -1,21 +1,52 @@
 // ---- Konfiguration (später anpassen) ----
 const CONFIG = {
+  // Lookup-Flow (GET) – komplette URL inkl. Secret am Ende:
   lookupEndpoint: "https://defaulteee05d909b754472b1cd58561389d4.d0.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/f783fa9e5318425c99947d805c4cd10f/triggers/manual/paths/invoke/?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=I5HNEZ3GG1im8YwjO6FP61EkuyekTrJ0_U-XYv3Cg7Q&key=vwX7-84jhs",
+  
+  // Submit-Flow (POST) – kommt später
   endpoint: "",
   secretHeaderName: "x-pp-secret",
   secretHeaderValue: "",
+  
   allowedUnits: ["Flasche", "Kiste"]
 };
 
-// ---- UI aufbauen ----
+// ---- Globale Variablen ----
+let articles = []; // Wird dynamisch aus Lookup-Flow befüllt
 const grid = document.getElementById("itemsGrid");
 const teamSel = document.getElementById("team");
 const msg = document.getElementById("msg");
 const state = {}; // z.B. {"Bier": {Flasche:0, Kiste:0}, ...}
 
+// ---- Lookup-Flow abrufen ----
+async function fetchLookups() {
+  try {
+    setMsg("Lade Daten…");
+    const res = await fetch(CONFIG.lookupEndpoint, { method: "GET" });
+    const data = await res.json();
+    if (!res.ok || data.ok === false) throw new Error(data.message || "Lookup fehlgeschlagen");
+
+    // Teams ins Dropdown
+    const teamOptions = (data.teams || []).map(t => t.Teamname).filter(Boolean);
+    teamSel.innerHTML = `<option value="">– bitte Team wählen –</option>` +
+      teamOptions.map(t => `<option>${t}</option>`).join("");
+
+    // Artikel in Liste
+    articles = (data.articles || []).map(a => a.Artikel).filter(Boolean);
+
+    // Kacheln aufbauen
+    buildTiles();
+    setMsg("");
+  } catch (err) {
+    console.error(err);
+    setMsg("Konnte Teams/Artikel nicht laden. Bitte später erneut versuchen.", "err");
+  }
+}
+
+// ---- UI aufbauen ----
 function buildTiles() {
   grid.innerHTML = "";
-  CONFIG.articles.forEach(a => {
+  articles.forEach(a => {
     state[a] = { Flasche: 0, Kiste: 0 };
     const tile = document.createElement("div");
     tile.className = "tile";
@@ -78,7 +109,7 @@ function collectPayload() {
 async function submitData() {
   const payload = collectPayload();
   if (!payload.team) return setMsg("Bitte ein Team wählen.", "err");
-  if (payload.positions.length === 0) return setMsg("Bitte mindestens eine Menge über die ±‑Buttons setzen.", "err");
+  if (payload.positions.length === 0) return setMsg("Bitte mindestens eine Menge über die ±-Buttons setzen.", "err");
 
   if (!CONFIG.endpoint) {
     // Bis der Flow steht, zeigen wir nur eine Vorschau in der Konsole.
@@ -111,5 +142,5 @@ async function submitData() {
 document.getElementById("submitBtn").addEventListener("click", submitData);
 document.getElementById("resetBtn").addEventListener("click", resetForm);
 
-// Init
-buildTiles();
+// ---- Init ----
+fetchLookups();
