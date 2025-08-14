@@ -5,7 +5,7 @@
 
 // ---- Konfiguration ----
 const CONFIG = {
-  // Lookup-Flow (GET) – komplette URL inkl. &key=<LookupSecret>
+  // Lookup-Flow (GET)
   lookupEndpoint:
     "https://defaulteee05d909b754472b1cd58561389d4.d0.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/f783fa9e5318425c99947d805c4cd10f/triggers/manual/paths/invoke/?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=I5HNEZ3GG1im8YwjO6FP61EkuyekTrJ0_U-XYv3Cg7Q&key=vwX7-84jhs",
 
@@ -24,8 +24,10 @@ let articles = []; // [{key, name}]
 const grid    = document.getElementById("itemsGrid");
 const teamSel = document.getElementById("team");
 const msg     = document.getElementById("msg");
+const submitBtn = document.getElementById("submitBtn");
+const resetBtn  = document.getElementById("resetBtn");
 
-// Warenkorb-Status als Plain Object: { [articleKey]: { Flasche:number, Kiste:number, name:string } }
+// Warenkorb-Status
 const state = {};
 
 // ---- kleine Utils ----
@@ -45,7 +47,6 @@ function escapeHtml(s) {
     .replaceAll("'", "&#039;");
 }
 
-// Für DOM-IDs (keine Leer-/Sonderzeichen): "Bier Kiste" -> "Bier_Kiste"
 function safeId(s) {
   return String(s)
     .normalize("NFKD")
@@ -57,7 +58,6 @@ function safeId(s) {
 // ---- UI bauen ----
 function buildTiles() {
   grid.innerHTML = "";
-  // state leeren
   Object.keys(state).forEach(k => delete state[k]);
 
   articles.forEach(a => {
@@ -65,7 +65,6 @@ function buildTiles() {
     const label = a.name ?? a.Artikel ?? String(a);
     const skey  = safeId(key);
 
-    // Initial in den State
     state[key] = { Flasche: 0, Kiste: 0, name: label };
 
     const tile = document.createElement("div");
@@ -90,17 +89,15 @@ function buildTiles() {
   });
 }
 
-// Ein einziger delegierter Click-Listener (außerhalb von buildTiles)
 grid.addEventListener("click", (e) => {
   const btn = e.target.closest("button.btn-ctr");
   if (!btn) return;
   e.preventDefault();
 
   const key   = btn.dataset.article;
-  const unit  = btn.dataset.unit;        // "Flasche" | "Kiste"
+  const unit  = btn.dataset.unit;
   const delta = parseInt(btn.dataset.delta, 10);
 
-  // Sicherstellen, dass der State-Eintrag existiert
   if (!state[key]) {
     state[key] = { Flasche: 0, Kiste: 0, name: key };
   }
@@ -116,11 +113,9 @@ grid.addEventListener("click", (e) => {
 });
 
 // ---- Formular-Aktionen ----
-function resetForm() {
-  // Team
+function resetForm(clearMsg = false) {
   teamSel.value = "";
 
-  // Mengen in State & UI zurücksetzen
   Object.entries(state).forEach(([key, entry]) => {
     CONFIG.allowedUnits.forEach(u => {
       entry[u] = 0;
@@ -129,11 +124,11 @@ function resetForm() {
     });
   });
 
-  setMsg("");
+  if (clearMsg) setMsg("");
 }
 
 function collectPayload() {
-  const teamVal = (teamSel.value || "").trim(); // id oder name je nach Lookup
+  const teamVal = (teamSel.value || "").trim();
   const positions = [];
 
   Object.entries(state).forEach(([key, entry]) => {
@@ -145,14 +140,14 @@ function collectPayload() {
 
   return {
     submissionId: (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`),
-    teamname: teamVal,                              // <- Flow erwartet "teamname"
-    datum: new Date().toISOString().slice(0,10),    // yyyy-MM-dd (für Abrechnungsmonat)
+    teamname: teamVal,
+    datum: new Date().toISOString().slice(0,10),
     quelle: "MiniWebApp",
     positions
   };
 }
 
-// ---- Normalizer für Lookup-Response ----
+// ---- Normalizer ----
 function normalizeTeams(payload) {
   const arr = Array.isArray(payload) ? payload : (payload?.body ?? []);
   return arr.map(t => ({
@@ -173,7 +168,6 @@ function normalizeArticles(payload) {
 async function fetchLookups() {
   try {
     setMsg("Lade Daten…");
-
     const res = await fetch(CONFIG.lookupEndpoint, { method: "GET" });
     const data = await res.json();
 
@@ -188,16 +182,13 @@ async function fetchLookups() {
       throw new Error("Ungültiges Lookup-Format oder leere Daten");
     }
 
-    // Team-Select aufbauen
     teamSel.innerHTML =
       `<option value="">– bitte Team wählen –</option>` +
       teamsNorm.map(t =>
         `<option value="${escapeHtml(t.name)}">${escapeHtml(t.name)}</option>`
-        // ^ Wenn du IDs speichern willst: value="${escapeHtml(t.id)}"
       ).join("");
 
-    // Artikel speichern & Kacheln rendern
-    articles = articlesNorm; // [{key,name}]
+    articles = articlesNorm;
     buildTiles();
     setMsg("");
   } catch (err) {
@@ -215,11 +206,12 @@ async function submitData() {
     return;
   }
   if (payload.positions.length === 0) {
-    setMsg("Bitte mindestens eine Menge über die ±‑Buttons setzen.", "err");
+    setMsg("Bitte mindestens eine Menge über die ±-Buttons setzen.", "err");
     return;
   }
 
   try {
+    submitBtn.disabled = true;
     setMsg("Übermittle…");
     const res = await fetch(CONFIG.endpoint, {
       method: "POST",
@@ -230,41 +222,38 @@ async function submitData() {
       body: JSON.stringify(payload)
     });
 
-    // 204 kommt nur beim OPTIONS-Preflight, POST sollte JSON liefern:
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok || data?.ok === false) {
       throw new Error(data?.message || `HTTP ${res.status}`);
     }
 
-    // Erfolg
+    resetForm(false); // Form leeren, Meldung behalten
     setMsg(
       `Danke! Vorgangscode: ${data.submissionId || payload.submissionId} · Positionen: ${data.positionsWritten ?? payload.positions.length}`,
       "ok"
     );
 
-    // (Optional) Ergebnisliste rendern – wenn du eine Liste im UI hast:
     if (Array.isArray(data.results)) {
-      // renderResults(data.results) // hier könntest du Häkchen/Warnungen pro Position zeigen
       console.log("Ergebnisse:", data.results);
     }
-
-    resetForm();
   } catch (err) {
     console.error(err);
     setMsg("Fehler bei der Übermittlung. Bitte später erneut versuchen.", "err");
+  } finally {
+    submitBtn.disabled = false;
   }
 }
 
 // ---- Events & Init ----
-document.getElementById("submitBtn").addEventListener("click", (e) => {
+submitBtn.addEventListener("click", (e) => {
   e.preventDefault();
   submitData();
 });
 
-document.getElementById("resetBtn").addEventListener("click", (e) => {
+resetBtn.addEventListener("click", (e) => {
   e.preventDefault();
-  resetForm();
+  resetForm(true);
 });
 
 fetchLookups();
