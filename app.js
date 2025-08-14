@@ -27,29 +27,28 @@ function buildTiles() {
   state.clear();
 
   articles.forEach(a => {
-    const key = a.key;
-    const label = a.name;
+  const key = a.key ?? a.Artikel ?? a.name ?? String(a);
+  const label = a.name ?? a.Artikel ?? String(a);
 
-    state.set(key, { Flasche: 0, Kiste: 0, name: label });
-
-    const tile = document.createElement("div");
-    tile.className = "tile";
-    tile.innerHTML = `
-      <h3>${label}</h3>
-      ${CONFIG.allowedUnits.map(u => `
-        <div class="row">
-          <span class="badge">${u}</span>
-          <div class="counter">
-            <button class="btn-ctr" data-article="${key}" data-unit="${u}" data-delta="-1">–</button>
-            <span class="qty" id="qty-${key}-${u}">0</span>
-            <button class="btn-ctr" data-article="${key}" data-unit="${u}" data-delta="1">+</button>
-          </div>
+  state[key] = { Flasche: 0, Kiste: 0 };
+  const tile = document.createElement("div");
+  tile.className = "tile";
+  tile.innerHTML = `
+    <h3>${label}</h3>
+    ${CONFIG.allowedUnits.map(u => `
+      <div class="row">
+        <span class="badge">${u}</span>
+        <div class="counter">
+          <button class="btn-ctr" data-article="${key}" data-unit="${u}" data-delta="-1">–</button>
+          <span class="qty" id="qty-${key}-${u}">0</span>
+          <button class="btn-ctr" data-article="${key}" data-unit="${u}" data-delta="1">+</button>
         </div>
-      `).join("")}
-    `;
-    grid.appendChild(tile);
-  });
-
+      </div>
+    `).join("")}
+  `;
+  grid.appendChild(tile);
+});
+  
   grid.addEventListener("click", (e) => {
     const btn = e.target.closest("button.btn-ctr");
     if (!btn) return;
