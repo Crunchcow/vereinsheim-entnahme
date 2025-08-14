@@ -34,37 +34,41 @@ function buildTiles() {
   const tile = document.createElement("div");
   tile.className = "tile";
   tile.innerHTML = `
-    <h3>${label}</h3>
-    ${CONFIG.allowedUnits.map(u => `
-      <div class="row">
-        <span class="badge">${u}</span>
-        <div class="counter">
-          <button class="btn-ctr" data-article="${key}" data-unit="${u}" data-delta="-1">–</button>
-          <span class="qty" id="qty-${key}-${u}">0</span>
-          <button class="btn-ctr" data-article="${key}" data-unit="${u}" data-delta="1">+</button>
-        </div>
+  <h3>${label}</h3>
+  ${CONFIG.allowedUnits.map(u => `
+    <div class="row">
+      <span class="badge">${u}</span>
+      <div class="counter">
+        <button type="button" class="btn-ctr" data-article="${key}" data-unit="${u}" data-delta="-1">–</button>
+        <span class="qty" id="qty-${key}-${u}">0</span>
+        <button type="button" class="btn-ctr" data-article="${key}" data-unit="${u}" data-delta="1">+</button>
       </div>
-    `).join("")}
-  `;
+    </div>
+  `).join("")}
+`;
   grid.appendChild(tile);
 });
   
   grid.addEventListener("click", (e) => {
-    const btn = e.target.closest("button.btn-ctr");
-    if (!btn) return;
-    const key  = btn.dataset.article;
-    const unit = btn.dataset.unit;
-    const delta= parseInt(btn.dataset.delta, 10);
+  const btn = e.target.closest("button.btn-ctr");
+  if (!btn) return;
+  e.preventDefault(); // wichtig bei Formularen
 
-    const entry = state.get(key);
-    const next = Math.max(0, (entry[unit] || 0) + delta);
-    entry[unit] = next;
-    state.set(key, entry);
+  const key   = btn.dataset.article;
+  const unit  = btn.dataset.unit;
+  const delta = parseInt(btn.dataset.delta, 10);
 
-    const qtyEl = document.getElementById(`qty-${key}-${unit}`);
-    if (qtyEl) qtyEl.textContent = String(next);
-  }, { passive: true });
-}
+  // defensive: falls state[key] / state.get(key) fehlt
+  const entry = state[key] ?? state.get?.(key) ?? { Flasche: 0, Kiste: 0 };
+  const next  = Math.max(0, (entry[unit] || 0) + delta);
+  entry[unit] = next;
+
+  // zurückschreiben (objekt ODER Map unterstützen)
+  if (state.set) state.set(key, entry); else state[key] = entry;
+
+  const qtyEl = document.getElementById(`qty-${key}-${unit}`);
+  if (qtyEl) qtyEl.textContent = String(next);
+}, /* { passive: true } weglassen */);
 
 // ---- Helpers ----
 function setMsg(text, type) {
