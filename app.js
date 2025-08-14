@@ -143,7 +143,7 @@ function collectPayload() {
   };
 }
 
-// ---- Normalizer ----
+// ---- Normalizer  ----
 function pickArray(obj, ...paths) {
   for (const p of paths) {
     const v = p.split(".").reduce((acc, k) => (acc && acc[k] != null ? acc[k] : undefined), obj);
