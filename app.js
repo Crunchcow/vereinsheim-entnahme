@@ -1,3 +1,4 @@
+<script>
 // ============================
 // Vereinsheim – Kühlschrank-Entnahme (WebApp)
 // ============================
@@ -132,7 +133,7 @@ function resetForm() {
 }
 
 function collectPayload() {
-  const team = (teamSel.value || "").trim();
+  const teamVal = (teamSel.value || "").trim(); // id oder name je nach Lookup
   const positions = [];
 
   Object.entries(state).forEach(([key, entry]) => {
@@ -143,10 +144,11 @@ function collectPayload() {
   });
 
   return {
-    team,
-    positions,
+    submissionId: (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`),
+    teamname: teamVal,                              // <- Flow erwartet "teamname"
+    datum: new Date().toISOString().slice(0,10),    // yyyy-MM-dd (für Abrechnungsmonat)
     quelle: "MiniWebApp",
-    clientTime: new Date().toISOString()
+    positions
   };
 }
 
@@ -190,7 +192,8 @@ async function fetchLookups() {
     teamSel.innerHTML =
       `<option value="">– bitte Team wählen –</option>` +
       teamsNorm.map(t =>
-        `<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)}</option>`
+        `<option value="${escapeHtml(t.name)}">${escapeHtml(t.name)}</option>`
+        // ^ Wenn du IDs speichern willst: value="${escapeHtml(t.id)}"
       ).join("");
 
     // Artikel speichern & Kacheln rendern
@@ -207,7 +210,7 @@ async function fetchLookups() {
 async function submitData() {
   const payload = collectPayload();
 
-  if (!payload.team) {
+  if (!payload.teamname) {
     setMsg("Bitte ein Team wählen.", "err");
     return;
   }
@@ -227,15 +230,25 @@ async function submitData() {
       body: JSON.stringify(payload)
     });
 
+    // 204 kommt nur beim OPTIONS-Preflight, POST sollte JSON liefern:
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || data.ok === false) {
-      throw new Error(data.message || `HTTP ${res.status}`);
+
+    if (!res.ok || data?.ok === false) {
+      throw new Error(data?.message || `HTTP ${res.status}`);
     }
 
+    // Erfolg
     setMsg(
-      `Danke! Vorgangscode: ${data.submissionId || "–"} · Positionen: ${data.positionsWritten ?? payload.positions.length}`,
+      `Danke! Vorgangscode: ${data.submissionId || payload.submissionId} · Positionen: ${data.positionsWritten ?? payload.positions.length}`,
       "ok"
     );
+
+    // (Optional) Ergebnisliste rendern – wenn du eine Liste im UI hast:
+    if (Array.isArray(data.results)) {
+      // renderResults(data.results) // hier könntest du Häkchen/Warnungen pro Position zeigen
+      console.log("Ergebnisse:", data.results);
+    }
+
     resetForm();
   } catch (err) {
     console.error(err);
@@ -255,3 +268,4 @@ document.getElementById("resetBtn").addEventListener("click", (e) => {
 });
 
 fetchLookups();
+</script>
