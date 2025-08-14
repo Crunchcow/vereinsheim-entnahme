@@ -1,15 +1,14 @@
-<script>
 // ============================
-// Vereinsheim – Kühlschrank-Entnahme (WebApp)  •  Variante A (defer)
+// Vereinsheim – Kühlschrank-Entnahme (WebApp)
 // ============================
+
+console.debug("[app] booting…");
 
 // ---- Konfiguration ----
 const CONFIG = {
-  // Lookup-Flow (GET)
   lookupEndpoint:
     "https://defaulteee05d909b754472b1cd58561389d4.d0.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/f783fa9e5318425c99947d805c4cd10f/triggers/manual/paths/invoke/?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=I5HNEZ3GG1im8YwjO6FP61EkuyekTrJ0_U-XYv3Cg7Q&key=vwX7-84jhs",
 
-  // Submit-Flow (POST)
   endpoint:
     "https://defaulteee05d909b754472b1cd58561389d4.d0.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/3960e2006ecf4edd964af0e72a034dcc/triggers/manual/paths/invoke/?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=r1rgrJxrW_NOB1eLHGW61uPXpMFToympIICc3oKTVOg",
 
@@ -26,16 +25,22 @@ const msg       = document.getElementById("msg");
 const submitBtn = document.getElementById("submitBtn");
 const resetBtn  = document.getElementById("resetBtn");
 
-// Bootstrap-Diagnose
-console.debug("Boot:", {
-  grid: !!grid, teamSel: !!teamSel, msg: !!msg, submitBtn: !!submitBtn, resetBtn: !!resetBtn
+console.debug("[app] dom:", { grid: !!grid, teamSel: !!teamSel, msg: !!msg, submitBtn: !!submitBtn, resetBtn: !!resetBtn });
+
+// ---- globaler Fehlerhaken (zeigt Fehler im UI)
+window.addEventListener("error", (e) => {
+  console.error("[app] uncaught:", e.error || e.message || e);
+  if (msg) {
+    msg.className = "msg err";
+    msg.textContent = "Ein Fehler ist aufgetreten. Siehe Konsole (F12).";
+  }
 });
 
 // ---- State ----
-let articles = [];                   // [{key, name}]
-const state = {};                    // { [articleKey]: { Flasche:number, Kiste:number, name:string } }
+let articles = []; // [{key,name}]
+const state = {};  // { [articleKey]: { Flasche:number, Kiste:number, name:string } }
 
-// ---- kleine Utils ----
+// ---- Utils ----
 const $ = (id) => document.getElementById(id);
 
 function setMsg(text, type) {
@@ -46,23 +51,18 @@ function setMsg(text, type) {
 
 function escapeHtml(s) {
   return String(s)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+    .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 }
 
-// "Bier Kiste" -> "Bier_Kiste"
 function safeId(s) {
-  return String(s)
-    .normalize("NFKD")
+  return String(s).normalize("NFKD")
     .replace(/\p{Diacritic}/gu, "")
     .replace(/\s+/g, "_")
     .replace(/[^a-zA-Z0-9_-]/g, "");
 }
 
-// ---- UI bauen ----
+// ---- UI ----
 function buildTiles() {
   if (!grid) return;
   grid.innerHTML = "";
@@ -72,7 +72,6 @@ function buildTiles() {
     const key   = a.key ?? a.Artikel ?? a.name ?? String(a);
     const label = a.name ?? a.Artikel ?? String(a);
     const skey  = safeId(key);
-
     state[key] = { Flasche: 0, Kiste: 0, name: label };
 
     const tile = document.createElement("div");
@@ -97,149 +96,119 @@ function buildTiles() {
   });
 }
 
-// Delegierter Click-Listener (nur wenn grid existiert)
 if (grid) {
   grid.addEventListener("click", (e) => {
     const btn = e.target.closest("button.btn-ctr");
     if (!btn) return;
     e.preventDefault();
-
-    const key   = btn.dataset.article;
-    const unit  = btn.dataset.unit;        // "Flasche" | "Kiste"
-    const delta = parseInt(btn.dataset.delta, 10);
-
-    if (!state[key]) {
-      state[key] = { Flasche: 0, Kiste: 0, name: key };
-    }
-
-    const current = Number(state[key][unit] || 0);
-    const next    = Math.max(0, current + (Number.isFinite(delta) ? delta : 0));
+    const key = btn.dataset.article;
+    const unit = btn.dataset.unit;
+    const delta = parseInt(btn.dataset.delta, 10) || 0;
+    if (!state[key]) state[key] = { Flasche: 0, Kiste: 0, name: key };
+    const next = Math.max(0, (Number(state[key][unit]) || 0) + delta);
     state[key][unit] = next;
-
-    const skey = safeId(key);
-    const su   = safeId(unit);
-    const qtyEl = document.getElementById(`qty-${skey}-${su}`);
+    const qtyEl = document.getElementById(`qty-${safeId(key)}-${safeId(unit)}`);
     if (qtyEl) qtyEl.textContent = String(next);
   });
 }
 
-// ---- Formular-Aktionen ----
+// ---- Form Actions ----
 function resetForm(clearMsg = false) {
   if (teamSel) teamSel.value = "";
-
   Object.entries(state).forEach(([key, entry]) => {
     CONFIG.allowedUnits.forEach(u => {
       entry[u] = 0;
-      const qtyEl = document.getElementById(`qty-${safeId(key)}-${safeId(u)}`);
-      if (qtyEl) qtyEl.textContent = "0";
+      const el = document.getElementById(`qty-${safeId(key)}-${safeId(u)}`);
+      if (el) el.textContent = "0";
     });
   });
-
   if (clearMsg) setMsg("");
 }
 
 function collectPayload() {
   const teamVal = (teamSel?.value || "").trim();
   const positions = [];
-
   Object.entries(state).forEach(([key, entry]) => {
     CONFIG.allowedUnits.forEach(u => {
       const menge = Number(entry[u] || 0);
       if (menge > 0) positions.push({ artikel: key, einheit: u, menge });
     });
   });
-
   return {
     submissionId: (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`),
-    teamname: teamVal,                          // Flow: Spalte Teamname
-    datum: new Date().toISOString().slice(0,10),// yyyy-MM-dd
+    teamname: teamVal,
+    datum: new Date().toISOString().slice(0,10),
     quelle: "MiniWebApp",
     positions
   };
 }
 
-// ---- Flexible Lookup-Pfade ----
+// ---- Normalizer ----
 function pickArray(obj, ...paths) {
   for (const p of paths) {
-    const v = p.split('.').reduce((acc, k) => (acc && acc[k] != null ? acc[k] : undefined), obj);
+    const v = p.split(".").reduce((acc, k) => (acc && acc[k] != null ? acc[k] : undefined), obj);
     if (Array.isArray(v)) return v;
   }
   return [];
 }
 
 function normalizeTeams(raw) {
-  const arr = Array.isArray(raw) ? raw
-            : pickArray(raw, 'body', 'teams', 'teams.body', 'value', 'data');
+  const arr = Array.isArray(raw) ? raw : pickArray(raw, "body", "teams", "teams.body", "value", "data");
   return arr.map(t => {
-    const id   = t.id ?? t.Teamname ?? t.name ?? t.teamname ?? '';
-    const name = t.name ?? t.Teamname ?? t.teamname ?? String(id || '');
+    const name = t.name ?? t.Teamname ?? t.teamname ?? t.id ?? "";
+    const id   = t.id   ?? name;
     return { id, name };
-  }).filter(t => t.id || t.name);
+  }).filter(t => t.name);
 }
 
 function normalizeArticles(raw) {
-  const arr = Array.isArray(raw) ? raw
-            : pickArray(raw, 'body', 'articles', 'articles.body', 'value', 'data');
+  const arr = Array.isArray(raw) ? raw : pickArray(raw, "body", "articles", "articles.body", "value", "data");
   return arr.map(a => {
-    const key  = a.key ?? a.Artikel ?? a.name ?? '';
-    const name = a.name ?? a.Artikel ?? String(key || '');
+    const key  = a.key ?? a.Artikel ?? a.name ?? "";
+    const name = a.name ?? a.Artikel ?? key;
     return { key, name };
   }).filter(a => a.key && a.name);
 }
 
-// ---- Lookups laden ----
+// ---- Lookups ----
 async function fetchLookups() {
   try {
+    console.debug("[lookup] GET", CONFIG.lookupEndpoint);
     setMsg("Lade Daten…");
-
     const res = await fetch(CONFIG.lookupEndpoint, { method: "GET" });
+    console.debug("[lookup] status", res.status);
     const data = await res.json().catch(() => ({}));
-    console.debug("Lookup-Rohdaten:", data);
+    console.debug("[lookup] raw", data);
 
-    if (!res.ok) {
-      throw new Error(data?.message || `HTTP ${res.status}`);
+    if (!res.ok || data.ok === false) {
+      throw new Error(data.message || `HTTP ${res.status}`);
     }
 
     const teamsNorm    = normalizeTeams(data.teams ?? data?.body?.teams ?? data);
     const articlesNorm = normalizeArticles(data.articles ?? data?.body?.articles ?? data);
-
-    console.debug("Teams (norm):", teamsNorm);
-    console.debug("Artikel (norm):", articlesNorm);
+    console.debug("[lookup] norm", { teams: teamsNorm.length, articles: articlesNorm.length });
 
     if (!teamSel || !grid) throw new Error("DOM nicht bereit (teamSel/grid fehlt)");
-    if (!teamsNorm.length || !articlesNorm.length) {
-      throw new Error("Ungültiges Lookup-Format oder leere Daten");
-    }
+    if (!teamsNorm.length || !articlesNorm.length) throw new Error("Ungültiges Lookup-Format oder leere Daten");
 
-    // Team-Select aufbauen (value = sichtbarer Name → passt zu tblVerbrauch.Teamname)
     teamSel.innerHTML =
       `<option value="">– bitte Team wählen –</option>` +
-      teamsNorm.map(t =>
-        `<option value="${escapeHtml(t.name)}">${escapeHtml(t.name)}</option>`
-      ).join("");
+      teamsNorm.map(t => `<option value="${escapeHtml(t.name)}">${escapeHtml(t.name)}</option>`).join("");
 
-    // Artikel speichern & Kacheln rendern
     articles = articlesNorm;
     buildTiles();
     setMsg("");
   } catch (err) {
-    console.error("Lookup-Fehler:", err);
+    console.error("[lookup] error", err);
     setMsg("Konnte Teams/Artikel nicht laden. Bitte später erneut versuchen.", "err");
   }
 }
 
-// ---- Absenden ----
+// ---- Submit ----
 async function submitData() {
   const payload = collectPayload();
-
-  if (!payload.teamname) {
-    setMsg("Bitte ein Team wählen.", "err");
-    return;
-  }
-  if (payload.positions.length === 0) {
-    setMsg("Bitte mindestens eine Menge über die ±-Buttons setzen.", "err");
-    return;
-  }
+  if (!payload.teamname) return setMsg("Bitte ein Team wählen.", "err");
+  if (payload.positions.length === 0) return setMsg("Bitte mindestens eine Menge über die ±‑Buttons setzen.", "err");
 
   try {
     if (submitBtn) submitBtn.disabled = true;
@@ -252,24 +221,17 @@ async function submitData() {
       },
       body: JSON.stringify(payload)
     });
-
     const data = await res.json().catch(() => ({}));
+    if (!res.ok || data?.ok === false) throw new Error(data?.message || `HTTP ${res.status}`);
 
-    if (!res.ok || data?.ok === false) {
-      throw new Error(data?.message || `HTTP ${res.status}`);
-    }
-
-    resetForm(false); // Form leeren, Meldung behalten
+    resetForm(false);
     setMsg(
       `Danke! Vorgangscode: ${data.submissionId || payload.submissionId} · Positionen: ${data.positionsWritten ?? payload.positions.length}`,
       "ok"
     );
-
-    if (Array.isArray(data.results)) {
-      console.log("Ergebnisse:", data.results);
-    }
+    if (Array.isArray(data.results)) console.log("Ergebnisse:", data.results);
   } catch (err) {
-    console.error(err);
+    console.error("[submit] error", err);
     setMsg("Fehler bei der Übermittlung. Bitte später erneut versuchen.", "err");
   } finally {
     if (submitBtn) submitBtn.disabled = false;
@@ -277,16 +239,15 @@ async function submitData() {
 }
 
 // ---- Events & Init ----
-if (submitBtn) submitBtn.addEventListener("click", (e) => {
-  e.preventDefault();
-  submitData();
-});
+if (submitBtn) submitBtn.addEventListener("click", (e) => { e.preventDefault(); submitData(); });
+if (resetBtn)  resetBtn.addEventListener("click",  (e) => { e.preventDefault(); resetForm(true); });
 
-if (resetBtn) resetBtn.addEventListener("click", (e) => {
-  e.preventDefault();
-  resetForm(true);
-});
+// mehrfach abgesichert starten
+fetchLookups();                                   // sofort (bei defer)
+window.addEventListener("DOMContentLoaded", fetchLookups);
+window.addEventListener("load", fetchLookups);
 
-// Start
-fetchLookups();
-</script>
+// Debug‑Hilfen
+window._fetchLookups = fetchLookups;
+window._state = state;
+console.debug("[app] ready.");
