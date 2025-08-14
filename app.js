@@ -1,30 +1,24 @@
 // ---- Konfiguration ----
 const CONFIG = {
-  lookupEndpoint: "DEINE_LOOKUP_FLOW_URL?key=DEIN_LOOKUP_SECRET", // <- morgen einsetzen
-  endpoint: "", // POST-Flow-URL (kommt später in Schritt 2)
+  // Lookup-Flow (GET) – komplette URL inkl. &key=<LookupSecret>
+  lookupEndpoint: "https://defaulteee05d909b754472b1cd58561389d4.d0.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/f783fa9e5318425c99947d805c4cd10f/triggers/manual/paths/invoke/?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=I5HNEZ3GG1im8YwjO6FP61EkuyekTrJ0_U-XYv3Cg7Q&key=vwX7-84jhs",
+
+  // Submit-Flow (POST)
+  endpoint: "YOUR_POST_URL",
   secretHeaderName: "x-pp-secret",
-  secretHeaderValue: "",
+  secretHeaderValue: "YOUR_SUBMIT_SECRET",
+
   allowedUnits: ["Flasche", "Kiste"]
 };
 
-// ---- Fallback-Daten (für Testbetrieb ohne Flow) ----
-const FALLBACK = {
-  teams: ["1. Herren", "2. Herren"],
-  articles: [
-    "Bier", "Cola", "Wasser", "Fanta", "Spezi", "Radler",
-    "Apfelschorle", "Energy", "Iso-Getränk", "Traubensaft", "Kirschsaft",
-    "Orangensaft", "Wasser still", "Wasser medium", "Kaffee", "Tee"
-  ]
-};
-
-// ---- UI-Elemente ----
+// ---- Globale Variablen/DOM ----
+let articles = []; // dynamisch aus Lookup
 const grid = document.getElementById("itemsGrid");
 const teamSel = document.getElementById("team");
 const msg = document.getElementById("msg");
-let articles = [];
-const state = {}; // z.B. {"Bier": {Flasche:0, Kiste:0}, ...}
+const state = {}; // z.B. {"Bier": {Flasche:0, Kiste:0}}
 
-// ---- Tiles aufbauen ----
+// ---- UI bauen ----
 function buildTiles() {
   grid.innerHTML = "";
   articles.forEach(a => {
@@ -59,7 +53,12 @@ function buildTiles() {
   }, { passive: true });
 }
 
-// ---- Formular zurücksetzen ----
+// ---- Helpers ----
+function setMsg(text, type) {
+  msg.className = "msg" + (type ? " " + type : "");
+  msg.textContent = text || "";
+}
+
 function resetForm() {
   Object.keys(state).forEach(a => CONFIG.allowedUnits.forEach(u => {
     state[a][u] = 0;
@@ -70,13 +69,6 @@ function resetForm() {
   setMsg("");
 }
 
-// ---- Nachricht setzen ----
-function setMsg(text, type) {
-  msg.className = "msg" + (type ? " " + type : "");
-  msg.textContent = text || "";
-}
-
-// ---- Payload sammeln ----
 function collectPayload() {
   const team = teamSel.value.trim();
   const positions = [];
@@ -89,17 +81,34 @@ function collectPayload() {
   return { team, positions, quelle: "MiniWebApp", clientTime: new Date().toISOString() };
 }
 
-// ---- Daten an Flow senden ----
+// ---- Lookups laden ----
+async function fetchLookups() {
+  try {
+    setMsg("Lade Daten…");
+    const res = await fetch(CONFIG.lookupEndpoint, { method: "GET" });
+    const data = await res.json();
+    if (!res.ok || data.ok === false) throw new Error(data.message || `HTTP ${res.status}`);
+
+    // Erwartetes Format: { ok:true, teams:[ "1. Herren", ... ], articles:[ "Bier", ... ] }
+    if (!Array.isArray(data.teams) || !Array.isArray(data.articles)) throw new Error("Ungültiges Lookup-Format");
+
+    teamSel.innerHTML = `<option value="">– bitte Team wählen –</option>` +
+      data.teams.map(t => `<option>${t}</option>`).join("");
+
+    articles = data.articles.slice();
+    buildTiles();
+    setMsg("");
+  } catch (err) {
+    console.error("Lookup-Fehler:", err);
+    setMsg("Konnte Teams/Artikel nicht laden. Bitte später erneut versuchen.", "err");
+  }
+}
+
+// ---- Absenden ----
 async function submitData() {
   const payload = collectPayload();
   if (!payload.team) return setMsg("Bitte ein Team wählen.", "err");
-  if (payload.positions.length === 0) return setMsg("Bitte mindestens eine Menge über die ±-Buttons setzen.", "err");
-
-  if (!CONFIG.endpoint) {
-    console.log("DEMO: Würde senden:", payload);
-    setMsg(`Demo: Erfasst ${payload.positions.length} Position(en). (Flow-Endpunkt noch nicht konfiguriert)`, "ok");
-    return;
-  }
+  if (payload.positions.length === 0) return setMsg("Bitte mindestens eine Menge über die ±‑Buttons setzen.", "err");
 
   try {
     setMsg("Übermittle…");
@@ -113,7 +122,8 @@ async function submitData() {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data.ok === false) throw new Error(data.message || `HTTP ${res.status}`);
-    setMsg(`Danke! Vorgangscode: ${data.submissionId || "–"} / Positionen: ${data.positionsWritten ?? payload.positions.length}`, "ok");
+
+    setMsg(`Danke! Vorgangscode: ${data.submissionId || "–"} · Positionen: ${data.positionsWritten ?? payload.positions.length}`, "ok");
     resetForm();
   } catch (err) {
     console.error(err);
@@ -121,33 +131,7 @@ async function submitData() {
   }
 }
 
-// ---- Lookup-Daten laden ----
-async function fetchLookups() {
-  try {
-    if (!CONFIG.lookupEndpoint) throw new Error("Lookup-URL nicht konfiguriert");
-    const res = await fetch(CONFIG.lookupEndpoint);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    if (!data.teams || !data.articles) throw new Error("Ungültiges Lookup-Format");
-
-    teamSel.innerHTML = `<option value="">– bitte Team wählen –</option>` +
-      data.teams.map(t => `<option>${t}</option>`).join("");
-    articles = data.articles.slice();
-    buildTiles();
-  } catch (err) {
-    console.error("Lookup-Fehler:", err);
-    // Fallback nutzen, damit die Seite testbar bleibt
-    teamSel.innerHTML = `<option value="">– bitte Team wählen –</option>` +
-      FALLBACK.teams.map(t => `<option>${t}</option>`).join("");
-    articles = FALLBACK.articles.slice();
-    buildTiles();
-    setMsg("Hinweis: Live-Daten nicht erreichbar, Fallback aktiv.", "err");
-  }
-}
-
-// ---- Event-Handler ----
+// ---- Events & Init ----
 document.getElementById("submitBtn").addEventListener("click", submitData);
 document.getElementById("resetBtn").addEventListener("click", resetForm);
-
-// ---- Init ----
 fetchLookups();
