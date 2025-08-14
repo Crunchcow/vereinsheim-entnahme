@@ -10,7 +10,7 @@ const CONFIG = {
 
   // Submit-Flow (POST)
   endpoint:
-    "https://defaulteee05d909b754472b1cd58561389d4.d0.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/3960e2006ecf4edd964af0e72a034dcc/triggers/manual/paths/invoke/?api-version=1",
+    "https://defaulteee05d909b754472b1cd58561389d4.d0.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/3960e2006ecf4edd964af0e72a034dcc/triggers/manual/paths/invoke/?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=r1rgrJxrW_NOB1eLHGW61uPXpMFToympIICc3oKTVOg",
 
   secretHeaderName: "x-pp-secret",
   secretHeaderValue: "Verein2025!Entnahme",
