@@ -4,9 +4,9 @@ const CONFIG = {
   lookupEndpoint: "https://defaulteee05d909b754472b1cd58561389d4.d0.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/f783fa9e5318425c99947d805c4cd10f/triggers/manual/paths/invoke/?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=I5HNEZ3GG1im8YwjO6FP61EkuyekTrJ0_U-XYv3Cg7Q&key=vwX7-84jhs",
 
   // Submit-Flow (POST)
-  endpoint: "YOUR_POST_URL",
+  endpoint: "",
   secretHeaderName: "x-pp-secret",
-  secretHeaderValue: "YOUR_SUBMIT_SECRET",
+  secretHeaderValue: "Verein2025!Entnahme",
 
   allowedUnits: ["Flasche", "Kiste"]
 };
