@@ -140,28 +140,49 @@ function collectPayload() {
 
   return {
     submissionId: (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`),
-    teamname: teamVal,
-    datum: new Date().toISOString().slice(0,10),
+    teamname: teamVal,                          // Flow: Spalte Teamname
+    datum: new Date().toISOString().slice(0,10),// yyyy-MM-dd
     quelle: "MiniWebApp",
     positions
   };
 }
 
-// ---- Normalizer ----
-function normalizeTeams(payload) {
-  const arr = Array.isArray(payload) ? payload : (payload?.body ?? []);
-  return arr.map(t => ({
-    id:   t.id   ?? t.Teamname ?? t.name ?? "",
-    name: t.name ?? t.Teamname ?? String(t.id ?? "")
-  })).filter(t => t.id && t.name);
+// ---- Flexible Lookup-Pfade ----
+// Hilfsfunktion: extrahiert sicher ein Array aus möglichen Pfaden
+function pickArray(obj, ...paths) {
+  for (const p of paths) {
+    const v = p.split('.').reduce((acc, k) => (acc && acc[k] != null ? acc[k] : undefined), obj);
+    if (Array.isArray(v) && v.length >= 0) return v;
+  }
+  return [];
 }
 
-function normalizeArticles(payload) {
-  const arr = Array.isArray(payload) ? payload : (payload?.body ?? []);
-  return arr.map(a => ({
-    key:  a.key  ?? a.Artikel ?? a.name ?? "",
-    name: a.name ?? a.Artikel ?? String(a.key ?? "")
-  })).filter(a => a.key && a.name);
+function normalizeTeams(raw) {
+  // akzeptierte Formen:
+  // - raw = Array
+  // - raw = { body: Array }
+  // - raw = { teams: Array } oder { teams: { body: Array } }
+  const arr = Array.isArray(raw) ? raw
+            : pickArray(raw, 'body', 'teams', 'teams.body', 'value', 'data');
+  return arr.map(t => {
+    const id   = t.id ?? t.Teamname ?? t.name ?? t.teamname ?? '';
+    const name = t.name ?? t.Teamname ?? t.teamname ?? String(id || '');
+    return { id, name };
+  }).filter(t => t.id || t.name);
+}
+
+function normalizeArticles(raw) {
+  // akzeptierte Formen:
+  // - raw = Array
+  // - raw = { body: Array }
+  // - raw = { articles: Array } oder { articles: { body: Array } }
+  const arr = Array.isArray(raw) ? raw
+            : pickArray(raw, 'body', 'articles', 'articles.body', 'value', 'data');
+  return arr.map(a => {
+    const key  = a.key ?? a.Artikel ?? a.name ?? '';
+    const name = a.name ?? a.Artikel ?? String(key || '');
+    return { key, name };
+  }).filter(a => a.key && a.name);
 }
 
 // ---- Lookups laden ----
@@ -169,25 +190,32 @@ async function fetchLookups() {
   try {
     setMsg("Lade Daten…");
     const res = await fetch(CONFIG.lookupEndpoint, { method: "GET" });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    console.debug("Lookup-Rohdaten:", data);
 
-    if (!res.ok || data.ok === false) {
-      throw new Error(data.message || `HTTP ${res.status}`);
+    if (!res.ok) {
+      throw new Error(data?.message || `HTTP ${res.status}`);
     }
 
-    const teamsNorm    = normalizeTeams(data.teams);
-    const articlesNorm = normalizeArticles(data.articles);
+    // Robust extrahieren – akzeptiere data.teams / data.body.teams / data / etc.
+    const teamsNorm    = normalizeTeams(data.teams ?? data?.body?.teams ?? data);
+    const articlesNorm = normalizeArticles(data.articles ?? data?.body?.articles ?? data);
+
+    console.debug("Teams (norm):", teamsNorm);
+    console.debug("Artikel (norm):", articlesNorm);
 
     if (!teamsNorm.length || !articlesNorm.length) {
       throw new Error("Ungültiges Lookup-Format oder leere Daten");
     }
 
+    // Team-Select aufbauen (value = sichtbarer Name → passt zu tblVerbrauch.Teamname)
     teamSel.innerHTML =
       `<option value="">– bitte Team wählen –</option>` +
       teamsNorm.map(t =>
         `<option value="${escapeHtml(t.name)}">${escapeHtml(t.name)}</option>`
       ).join("");
 
+    // Artikel speichern & Kacheln rendern
     articles = articlesNorm;
     buildTiles();
     setMsg("");
