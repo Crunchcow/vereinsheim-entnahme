@@ -182,7 +182,10 @@ async function sendFeedback() {
     return;
   }
 
-  // solange noch kein Flow eingerichtet ist
+  console.debug("[feedback] text:", text);
+  console.debug("[feedback] endpoint:", CONFIG.feedbackEndpoint);
+
+  // Falls Endpoint noch leer: kein Flow-Aufruf, nur Hinweis
   if (!CONFIG.feedbackEndpoint) {
     alert("Danke für dein Feedback! (Feedback-Flow noch nicht eingerichtet)");
     closeFeedback();
@@ -197,13 +200,22 @@ async function sendFeedback() {
     const res = await fetch(CONFIG.feedbackEndpoint, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        [CONFIG.secretHeaderName]: CONFIG.secretHeaderValue
+        "Content-Type": "application/json"
+        // kein extra Secret nötig, um es simpel zu halten
       },
       body: JSON.stringify(payload)
     });
 
-    const data = await res.json().catch(() => ({}));
+    console.debug("[feedback] response status:", res.status);
+
+    let data = {};
+    try {
+      data = await res.json();
+      console.debug("[feedback] response body:", data);
+    } catch (e) {
+      console.warn("[feedback] konnte Antwort nicht als JSON lesen:", e);
+    }
+
     if (!res.ok || data.ok === false) {
       throw new Error(data.message || `HTTP ${res.status}`);
     }
@@ -215,6 +227,7 @@ async function sendFeedback() {
     setMsg("Feedback konnte nicht gesendet werden.", "err");
   }
 }
+
 
 
 // ---- Lookups ----
