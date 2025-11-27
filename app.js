@@ -189,15 +189,20 @@ function normalizeArticles(raw) {
   }).filter(a => a.key && a.name);
 }
 
-// Feedback Flow
-// ---- Feedback Dialog ----
+// ============================
+// Feedback – Dialog & Versand
+// ============================
+
+// Feedback-Dialog öffnen
 function openFeedback() {
   if (!feedbackDialog) {
     console.warn("[feedback] dialog element not found");
     alert("Feedback-Dialog konnte nicht gefunden werden.");
     return;
   }
+
   if (feedbackTextEl) feedbackTextEl.value = "";
+
   if (feedbackDialog.showModal) {
     feedbackDialog.showModal();
   } else {
@@ -205,12 +210,14 @@ function openFeedback() {
   }
 }
 
+// Feedback-Dialog schließen
 function closeFeedback() {
   if (feedbackDialog && feedbackDialog.close) {
     feedbackDialog.close();
   }
 }
 
+// Feedback senden
 async function sendFeedback() {
   const text = (feedbackTextEl?.value || "").trim();
   if (!text) {
@@ -221,7 +228,6 @@ async function sendFeedback() {
   console.debug("[feedback] text:", text);
   console.debug("[feedback] endpoint:", CONFIG.feedbackEndpoint);
 
-  // solange kein Flow eingerichtet ist: nur Hinweis, nichts wird gesendet
   if (!CONFIG.feedbackEndpoint) {
     alert("Danke für dein Feedback! (Feedback-Flow noch nicht eingerichtet)");
     closeFeedback();
@@ -237,6 +243,8 @@ async function sendFeedback() {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
+        // Optional: Secret-Header, falls du später absichern willst:
+        // [CONFIG.secretHeaderName]: CONFIG.secretHeaderValue
       },
       body: JSON.stringify(payload)
     });
@@ -248,20 +256,7 @@ async function sendFeedback() {
       data = await res.json();
       console.debug("[feedback] response body:", data);
     } catch (e) {
-      console.warn("[feedback] konnte Antwort nicht als JSON lesen:", e);
-    }
-
-    if (!res.ok || data.ok === false) {
-      throw new Error(data.message || `HTTP ${res.status}`);
-    }
-
-    setMsg("Danke für dein Feedback! 🙌", "ok");
-    closeFeedback();
-  } catch (err) {
-    console.error("[feedback] error", err);
-    setMsg("Feedback konnte nicht gesendet werden.", "err");
-  }
-}
+      console.warn("[feedback] konnte Antw
 
 // ---- Lookups ----
 async function fetchLookups() {
