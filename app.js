@@ -28,6 +28,7 @@ const teamSel   = document.getElementById("team");
 const msg       = document.getElementById("msg");
 const submitBtn = document.getElementById("submitBtn");
 const resetBtn  = document.getElementById("resetBtn");
+const remarkEl  = document.getElementById("remark");
 
 // Feedback-spezifische Elemente
 const feedbackBtn       = document.getElementById("feedbackBtn");
@@ -134,6 +135,7 @@ if (grid) {
 // ---- Form Actions ----
 function resetForm(clearMsg = false) {
   if (teamSel) teamSel.value = "";
+  if (remarkEl) remarkEl.value = "";
   Object.entries(state).forEach(([key, entry]) => {
     CONFIG.allowedUnits.forEach(u => {
       entry[u] = 0;
@@ -146,6 +148,7 @@ function resetForm(clearMsg = false) {
 
 function collectPayload() {
   const teamVal = (teamSel?.value || "").trim();
+  const remark   = (remarkEl && remarkEl.value ? remarkEl.value : "").trim();
   const positions = [];
   Object.entries(state).forEach(([key, entry]) => {
     CONFIG.allowedUnits.forEach(u => {
@@ -158,6 +161,7 @@ function collectPayload() {
     teamname: teamVal,
     datum: new Date().toISOString().slice(0,10),
     quelle: "MiniWebApp",
+    bemerkung: remark,
     positions
   };
 }
