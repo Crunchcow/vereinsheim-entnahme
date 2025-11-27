@@ -192,3 +192,18 @@ body {
   justify-content: flex-end;
   gap: 8px;
 }
+
+.actions-wide {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.actions-left {
+  display: flex;
+  gap: 12px;
+}
+
+.actions-right {
+  display: flex;
+}
