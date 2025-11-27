@@ -189,20 +189,16 @@ function normalizeArticles(raw) {
   }).filter(a => a.key && a.name);
 }
 
-// ============================
-// Feedback – Dialog & Versand
-// ============================
-
-// Feedback-Dialog öffnen
+// ---- Feedback Dialog ----
 function openFeedback() {
   if (!feedbackDialog) {
     console.warn("[feedback] dialog element not found");
     alert("Feedback-Dialog konnte nicht gefunden werden.");
     return;
   }
-
-  if (feedbackTextEl) feedbackTextEl.value = "";
-
+  if (feedbackTextEl) {
+    feedbackTextEl.value = "";
+  }
   if (feedbackDialog.showModal) {
     feedbackDialog.showModal();
   } else {
@@ -210,16 +206,14 @@ function openFeedback() {
   }
 }
 
-// Feedback-Dialog schließen
 function closeFeedback() {
   if (feedbackDialog && feedbackDialog.close) {
     feedbackDialog.close();
   }
 }
 
-// Feedback senden
 async function sendFeedback() {
-  const text = (feedbackTextEl?.value || "").trim();
+  const text = (feedbackTextEl && feedbackTextEl.value ? feedbackTextEl.value : "").trim();
   if (!text) {
     alert("Bitte gib Feedback ein.");
     return;
@@ -228,13 +222,14 @@ async function sendFeedback() {
   console.debug("[feedback] text:", text);
   console.debug("[feedback] endpoint:", CONFIG.feedbackEndpoint);
 
+  // Wenn kein Endpoint konfiguriert ist, nichts senden
   if (!CONFIG.feedbackEndpoint) {
     alert("Danke für dein Feedback! (Feedback-Flow noch nicht eingerichtet)");
     closeFeedback();
     return;
   }
 
-  const payload = { text };
+  const payload = { text: text };
 
   try {
     setMsg("Sende Feedback…");
@@ -243,7 +238,7 @@ async function sendFeedback() {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
-        // Optional: Secret-Header, falls du später absichern willst:
+        // Optional: wenn du später mit Secret-Header absichern willst:
         // [CONFIG.secretHeaderName]: CONFIG.secretHeaderValue
       },
       body: JSON.stringify(payload)
@@ -256,7 +251,20 @@ async function sendFeedback() {
       data = await res.json();
       console.debug("[feedback] response body:", data);
     } catch (e) {
-      console.warn("[feedback] konnte Antw
+      console.warn("[feedback] konnte Antwort nicht als JSON lesen:", e);
+    }
+
+    if (!res.ok || data.ok === false) {
+      throw new Error(data.message || ("HTTP " + res.status));
+    }
+
+    setMsg("Danke für dein Feedback!", "ok");
+    closeFeedback();
+  } catch (err) {
+    console.error("[feedback] error", err);
+    setMsg("Feedback konnte nicht gesendet werden.", "err");
+  }
+}
 
 // ---- Lookups ----
 async function fetchLookups() {
