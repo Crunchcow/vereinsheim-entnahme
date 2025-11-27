@@ -27,12 +27,7 @@ const teamSel   = document.getElementById("team");
 const msg       = document.getElementById("msg");
 const submitBtn = document.getElementById("submitBtn");
 const resetBtn  = document.getElementById("resetBtn");
-// Feedback-spezifische Elemente
-const feedbackBtn       = document.getElementById("feedbackBtn");
-const feedbackDialog    = document.getElementById("feedbackDialog");
-const feedbackTextEl    = document.getElementById("feedbackText");
-const feedbackSendBtn   = document.getElementById("feedbackSendBtn");
-const feedbackCancelBtn = document.getElementById("feedbackCancelBtn");
+const payload = { text };
 
 console.debug("[app] dom:", { grid: !!grid, teamSel: !!teamSel, msg: !!msg, submitBtn: !!submitBtn, resetBtn: !!resetBtn });
 
@@ -179,30 +174,22 @@ function normalizeArticles(raw) {
   }).filter(a => a.key && a.name);
 }
 
-// ---- Feedback ----
-async function submitFeedback() {
-  if (!feedbackTextEl) return;
-
-  const text = (feedbackTextEl.value || "").trim();
+// Feedback Flow
+async function sendFeedback() {
+  const text = (feedbackTextEl?.value || "").trim();
   if (!text) {
-    alert("Bitte gib eine kurze Nachricht ein.");
+    alert("Bitte gib Feedback ein.");
     return;
   }
 
-  // Solange kein Endpoint eingetragen ist, keine Gefahr für andere Flows:
+  // solange noch kein Flow eingerichtet ist
   if (!CONFIG.feedbackEndpoint) {
-    alert("Die Feedback-Funktion ist noch nicht vollständig eingerichtet. Bitte sag Kai Bescheid 😊");
-    if (feedbackDialog?.close) feedbackDialog.close();
+    alert("Danke für dein Feedback! (Feedback-Flow noch nicht eingerichtet)");
+    closeFeedback();
     return;
   }
 
-  const payload = {
-    feedbackText: text,
-    teamname: (teamSel?.value || "").trim() || null,
-    timestamp: new Date().toISOString(),
-    userAgent: navigator.userAgent,
-    quelle: "FeedbackButton"
-  };
+  const payload = { text };
 
   try {
     setMsg("Sende Feedback…");
@@ -222,12 +209,13 @@ async function submitFeedback() {
     }
 
     setMsg("Danke für dein Feedback! 🙌", "ok");
-    if (feedbackDialog?.close) feedbackDialog.close();
+    closeFeedback();
   } catch (err) {
     console.error("[feedback] error", err);
-    setMsg("Feedback konnte nicht gesendet werden. Bitte später erneut versuchen.", "err");
+    setMsg("Feedback konnte nicht gesendet werden.", "err");
   }
 }
+
 
 // ---- Lookups ----
 async function fetchLookups() {
