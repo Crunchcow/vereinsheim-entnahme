@@ -12,14 +12,15 @@ const CONFIG = {
   endpoint:
     "https://defaulteee05d909b754472b1cd58561389d4.d0.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/3960e2006ecf4edd964af0e72a034dcc/triggers/manual/paths/invoke/?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=r1rgrJxrW_NOB1eLHGW61uPXpMFToympIICc3oKTVOg",
 
-  // NEU: separater Endpoint für Feedback (kommt später aus Power Automate)
+  // NEU: Feedback-Endpoint (Flow-URL später hier eintragen)
   feedbackEndpoint: "https://defaulteee05d909b754472b1cd58561389d4.d0.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/fc3375b25aec435997ba4cb3b61dec74/triggers/manual/paths/invoke?api-version=1",
-  
+
   secretHeaderName: "x-pp-secret",
   secretHeaderValue: "Verein2025!Entnahme",
 
   allowedUnits: ["Flasche", "Kiste"]
 };
+
 
 // ---- DOM-Referenzen ----
 const grid      = document.getElementById("itemsGrid");
@@ -27,9 +28,23 @@ const teamSel   = document.getElementById("team");
 const msg       = document.getElementById("msg");
 const submitBtn = document.getElementById("submitBtn");
 const resetBtn  = document.getElementById("resetBtn");
-const payload = { text };
 
-console.debug("[app] dom:", { grid: !!grid, teamSel: !!teamSel, msg: !!msg, submitBtn: !!submitBtn, resetBtn: !!resetBtn });
+// Feedback-spezifische Elemente
+const feedbackBtn       = document.getElementById("feedbackBtn");
+const feedbackDialog    = document.getElementById("feedbackDialog");
+const feedbackTextEl    = document.getElementById("feedbackText");
+const feedbackSendBtn   = document.getElementById("feedbackSendBtn");
+const feedbackCancelBtn = document.getElementById("feedbackCancelBtn");
+
+console.debug("[app] dom:", {
+  grid: !!grid,
+  teamSel: !!teamSel,
+  msg: !!msg,
+  submitBtn: !!submitBtn,
+  resetBtn: !!resetBtn,
+  feedbackBtn: !!feedbackBtn,
+  feedbackDialog: !!feedbackDialog
+});
 
 // ---- globaler Fehlerhaken (zeigt Fehler im UI)
 window.addEventListener("error", (e) => {
@@ -175,6 +190,27 @@ function normalizeArticles(raw) {
 }
 
 // Feedback Flow
+// ---- Feedback Dialog ----
+function openFeedback() {
+  if (!feedbackDialog) {
+    console.warn("[feedback] dialog element not found");
+    alert("Feedback-Dialog konnte nicht gefunden werden.");
+    return;
+  }
+  if (feedbackTextEl) feedbackTextEl.value = "";
+  if (feedbackDialog.showModal) {
+    feedbackDialog.showModal();
+  } else {
+    alert("Dein Browser unterstützt den Feedback-Dialog nicht.");
+  }
+}
+
+function closeFeedback() {
+  if (feedbackDialog && feedbackDialog.close) {
+    feedbackDialog.close();
+  }
+}
+
 async function sendFeedback() {
   const text = (feedbackTextEl?.value || "").trim();
   if (!text) {
@@ -185,7 +221,7 @@ async function sendFeedback() {
   console.debug("[feedback] text:", text);
   console.debug("[feedback] endpoint:", CONFIG.feedbackEndpoint);
 
-  // Falls Endpoint noch leer: kein Flow-Aufruf, nur Hinweis
+  // solange kein Flow eingerichtet ist: nur Hinweis, nichts wird gesendet
   if (!CONFIG.feedbackEndpoint) {
     alert("Danke für dein Feedback! (Feedback-Flow noch nicht eingerichtet)");
     closeFeedback();
@@ -201,7 +237,6 @@ async function sendFeedback() {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
-        // kein extra Secret nötig, um es simpel zu halten
       },
       body: JSON.stringify(payload)
     });
@@ -227,8 +262,6 @@ async function sendFeedback() {
     setMsg("Feedback konnte nicht gesendet werden.", "err");
   }
 }
-
-
 
 // ---- Lookups ----
 async function fetchLookups() {
@@ -299,36 +332,38 @@ async function submitData() {
 }
 
 // ---- Events & Init ----
-if (submitBtn) submitBtn.addEventListener("click", (e) => { e.preventDefault(); submitData(); });
-if (resetBtn)  resetBtn.addEventListener("click",  (e) => { e.preventDefault(); resetForm(true); });
+if (submitBtn) {
+  submitBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    submitData();
+  });
+}
 
-// Feedback öffnen
-if (feedbackBtn && feedbackDialog) {
+if (resetBtn) {
+  resetBtn.addEventListener("click",  (e) => {
+    e.preventDefault();
+    resetForm(true);
+  });
+}
+
+if (feedbackBtn) {
   feedbackBtn.addEventListener("click", (e) => {
     e.preventDefault();
-    if (feedbackTextEl) feedbackTextEl.value = "";
-    if (feedbackDialog.showModal) {
-      feedbackDialog.showModal();
-    } else {
-      // Fallback: simples alert, falls dialog-Element nicht unterstützt würde
-      alert("Dein Browser unterstützt den Feedback-Dialog nicht.");
-    }
+    openFeedback();
   });
 }
 
-// Feedback abbrechen
-if (feedbackCancelBtn && feedbackDialog) {
+if (feedbackCancelBtn) {
   feedbackCancelBtn.addEventListener("click", (e) => {
     e.preventDefault();
-    feedbackDialog.close();
+    closeFeedback();
   });
 }
 
-// Feedback senden
 if (feedbackSendBtn) {
   feedbackSendBtn.addEventListener("click", (e) => {
     e.preventDefault();
-    submitFeedback();
+    sendFeedback();
   });
 }
 
