@@ -38,6 +38,20 @@
 
     <section id="msg" class="msg"></section>
     <footer class="footer">© Kai Lemke / Sportheim Entnahme</footer>
+
+        <!-- Feedback-Dialog -->
+    <dialog id="feedbackDialog" class="dialog">
+      <form method="dialog" class="dialog-body">
+        <h2>Feedback zur Entnahme-Seite</h2>
+        <p class="dialog-text">Schreib uns kurz, was dir aufgefallen ist.</p>
+        <textarea id="feedbackText" rows="4" class="textarea"
+                  placeholder="Dein Feedback …"></textarea>
+        <div class="dialog-actions">
+          <button id="feedbackCancelBtn" class="btn ghost">Abbrechen</button>
+          <button id="feedbackSendBtn" class="btn primary">Feedback senden</button>
+        </div>
+      </form>
+    </dialog>
   </main>
 
   <script src="app.js" defer></script>
