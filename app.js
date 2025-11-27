@@ -12,6 +12,9 @@ const CONFIG = {
   endpoint:
     "https://defaulteee05d909b754472b1cd58561389d4.d0.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/3960e2006ecf4edd964af0e72a034dcc/triggers/manual/paths/invoke/?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=r1rgrJxrW_NOB1eLHGW61uPXpMFToympIICc3oKTVOg",
 
+  // NEU: separater Endpoint für Feedback (kommt später aus Power Automate)
+  feedbackEndpoint: "",
+  
   secretHeaderName: "x-pp-secret",
   secretHeaderValue: "Verein2025!Entnahme",
 
@@ -24,6 +27,12 @@ const teamSel   = document.getElementById("team");
 const msg       = document.getElementById("msg");
 const submitBtn = document.getElementById("submitBtn");
 const resetBtn  = document.getElementById("resetBtn");
+// Feedback-spezifische Elemente
+const feedbackBtn       = document.getElementById("feedbackBtn");
+const feedbackDialog    = document.getElementById("feedbackDialog");
+const feedbackTextEl    = document.getElementById("feedbackText");
+const feedbackSendBtn   = document.getElementById("feedbackSendBtn");
+const feedbackCancelBtn = document.getElementById("feedbackCancelBtn");
 
 console.debug("[app] dom:", { grid: !!grid, teamSel: !!teamSel, msg: !!msg, submitBtn: !!submitBtn, resetBtn: !!resetBtn });
 
@@ -170,6 +179,56 @@ function normalizeArticles(raw) {
   }).filter(a => a.key && a.name);
 }
 
+// ---- Feedback ----
+async function submitFeedback() {
+  if (!feedbackTextEl) return;
+
+  const text = (feedbackTextEl.value || "").trim();
+  if (!text) {
+    alert("Bitte gib eine kurze Nachricht ein.");
+    return;
+  }
+
+  // Solange kein Endpoint eingetragen ist, keine Gefahr für andere Flows:
+  if (!CONFIG.feedbackEndpoint) {
+    alert("Die Feedback-Funktion ist noch nicht vollständig eingerichtet. Bitte sag Kai Bescheid 😊");
+    if (feedbackDialog?.close) feedbackDialog.close();
+    return;
+  }
+
+  const payload = {
+    feedbackText: text,
+    teamname: (teamSel?.value || "").trim() || null,
+    timestamp: new Date().toISOString(),
+    userAgent: navigator.userAgent,
+    quelle: "FeedbackButton"
+  };
+
+  try {
+    setMsg("Sende Feedback…");
+
+    const res = await fetch(CONFIG.feedbackEndpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        [CONFIG.secretHeaderName]: CONFIG.secretHeaderValue
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.ok === false) {
+      throw new Error(data.message || `HTTP ${res.status}`);
+    }
+
+    setMsg("Danke für dein Feedback! 🙌", "ok");
+    if (feedbackDialog?.close) feedbackDialog.close();
+  } catch (err) {
+    console.error("[feedback] error", err);
+    setMsg("Feedback konnte nicht gesendet werden. Bitte später erneut versuchen.", "err");
+  }
+}
+
 // ---- Lookups ----
 async function fetchLookups() {
   try {
@@ -242,12 +301,43 @@ async function submitData() {
 if (submitBtn) submitBtn.addEventListener("click", (e) => { e.preventDefault(); submitData(); });
 if (resetBtn)  resetBtn.addEventListener("click",  (e) => { e.preventDefault(); resetForm(true); });
 
+// Feedback öffnen
+if (feedbackBtn && feedbackDialog) {
+  feedbackBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    if (feedbackTextEl) feedbackTextEl.value = "";
+    if (feedbackDialog.showModal) {
+      feedbackDialog.showModal();
+    } else {
+      // Fallback: simples alert, falls dialog-Element nicht unterstützt würde
+      alert("Dein Browser unterstützt den Feedback-Dialog nicht.");
+    }
+  });
+}
+
+// Feedback abbrechen
+if (feedbackCancelBtn && feedbackDialog) {
+  feedbackCancelBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    feedbackDialog.close();
+  });
+}
+
+// Feedback senden
+if (feedbackSendBtn) {
+  feedbackSendBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    submitFeedback();
+  });
+}
+
 // mehrfach abgesichert starten
 fetchLookups();                                   // sofort (bei defer)
 window.addEventListener("DOMContentLoaded", fetchLookups);
 window.addEventListener("load", fetchLookups);
 
-// Debug‑Hilfen
+// Debug-Hilfen
 window._fetchLookups = fetchLookups;
 window._state = state;
 console.debug("[app] ready.");
+
